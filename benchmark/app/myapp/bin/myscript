@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -eux
+
+# these statements will fail if the env vars are unbound
+# (these vars are set by rose task-env)
+echo "ROSE_SUITE_DIR=$ROSE_SUITE_DIR"
+echo "ROSE_TASK_NAME=$ROSE_TASK_NAME"
+
+# this will fail if the "ANSWER" env var wasn't set
+test $ANSWER == 42
+
+# this will fail if the mynamelist file wasn't successfully installed
+test -f mynamelist

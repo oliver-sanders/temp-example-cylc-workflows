@@ -1,0 +1,146 @@
+[meta]
+    title = Cylc 8 Benchmark
+    description = """
+        A crude attempt at a test workflow.
+
+        TODO:
+        * Convert the directives for directives_1 and directives_2 from
+          SLURM to AWS format.
+        * Add directives to other tasks if necessary.
+
+        The workflow should run and shut itself down automatically.
+        If there are any failed tasks left over at the end, the workflow will
+        "stall" instead.
+    """
+
+[scheduling]
+    [[graph]]
+        R1 = """
+            # these two tasks should run and succeed
+            directives_1 => fin
+            directives_2 => fin
+
+            # the "etl" task should fail if the "execution time limit" has been
+            # correctly implemented
+            etl:fail? => execution_time_limit_worked
+            etl:succeed? => execution_time_limit_did_not_work
+
+            # Rose
+            rose => fin
+
+            # Isodatetime
+            isodatetime => fin
+
+            # broadcast_1 will change an environment variable used by
+            # broadcast_2, if this doesn't work, then broadcast_2 will fail
+            broadcast_1 => broadcast_2 => fin
+        """
+
+
+[runtime]
+    # "root" is inherited by all tasks
+    # this configures all tasks to run via aws_batch
+    [[root]]
+        # platform = localhost  # run jobs locally
+        platform = aws_batch  # submit jobs to aws batch
+
+
+    # -- Directives --
+
+    # a task to show that AWS directives can be configured from Cylc
+    # Directives generally boil down to three things:
+    # * Time
+    # * CPUs
+    # * Memory
+    # (and also things like billing and queues which aren't relevant to your use case).
+    [[directives_1]]
+        script = true  # TODO: check AWS provisions us with what we asked for
+        execution time limit = PT5S  # time: 5 seconds
+        [[[directives]]]
+            # TODO: convert these directives from SLURM to AWS format
+            --mem=2Gn  # memory: 2 Gb
+            --tasks=2  # vcpus: 2, physical_cpus: 1
+
+    [[directives_2]]
+        script = true  # TODO: check AWS provisions us with what we asked for
+        execution time limit = PT30M  # time: 30 mins
+        [[[directives]]]
+            # TODO: convert these directives from SLURM to AWS format
+            --mem=10Gn  # memory: 10 Gb
+            --tasks=12  # vcpus: 12, physical_cpus: 6
+
+
+    # -- Execution Time Limit --
+
+    # a task which should always fail
+    [[etl]]
+        # a commmand that takes 20 seconds to run
+        script = sleep 20
+        # a configuration which kills the job if it takes more thant 5 seconds
+        execution time limit = PT5S
+
+    # this task will be run if etl works
+    [[execution_time_limit_worked]]
+        script = true
+
+    # this task will be run if etl does not work
+    [[execution_time_limit_did_not_work]]
+        script = false
+
+
+    # -- Rose --
+
+    # A common pattern is for Cylc tasks to run Rose Applications
+    [[rose]]
+        pre-script = eval $(rose task-env)
+        script = rose task-run
+        [[[environment]]]
+            # this task will run this configuration app/myapp/rose-app.conf
+            ROSE_TASK_APP = myapp
+
+
+    # -- Isodatetime (optional) --
+
+    # Many cycling workflows rely on the isodatetime command, this is a simple
+    # utility for datetime arithmetic, it's a dependency of Cylc of guaranteed
+    # to be installed, however, usually requires a wrapper script
+    # (just copy the Cylc/Rose wrapper script and change the name to "isodatetime")
+    [[isodatetime]]
+        script = test "${next_year}" -eq 2025
+        [[[environment]]]
+            next_year = """
+                $(isodatetime --offset=P1Y --print-format=CCYY)
+            """
+
+
+    # -- 2 Way Comms (optional) --
+
+    # Sometimes Cylc tasks may run Cylc commands for automation purposes.
+    # The main use is to send small amounts of data back to the scheduler,
+    # this can be used to alter the configuration of tasks yet to be run or
+    # direct the course of a "branched workflow" (see Cylc glossary).
+    # This may or may not be a requirement for the PP workflow, including
+    # it here in case it is
+    [[broadcast_1]]
+        script = """
+            cylc broadcast "${CYLC_WORKFLOW_ID}" \
+                -n broadcast_2 \
+                -p "${CYLC_TASK_CYCLE_POINT}" \
+                -s '[environment]CMD=true'
+            sleep 5
+        """
+
+    [[broadcast_2]]
+        # this would fail, however, the broadcast task will change the
+        # "script" value when it is run
+        script = $CMD
+        [[[environment]]]
+            CMD = false
+
+
+    # -- Fin --
+
+    # last task in the workflow
+    # If this runs without intervention, then the previous tests have passed
+    [[fin]]
+        script = true

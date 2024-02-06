@@ -1,0 +1,32 @@
+[meta]
+    title = "Toy Cylc 8 Workflow"
+    description = """
+        A basic workflow template for playing with.
+
+        This example "cycles" (i.e. repeats) every year in simulated time.
+        Multiple "year"s worth of cycles will run simultaneously.
+
+        To run this:
+            $ cylc vip <this directory>
+
+        Try opening the "graph" view in the GUI to get an idea what's going on.
+    """
+
+[scheduler]
+    cycle point format = CCYY
+
+[scheduling]
+    initial cycle point = 2000
+    [[graph]]
+        P1Y = """
+            a => b => c
+            b[-P1Y] => b
+        """
+
+[runtime]
+    [[a]]
+        script = sleep 1
+    [[b]]
+        script = sleep 2
+    [[c]]
+        script = sleep 1
