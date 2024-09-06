@@ -1,0 +1,24 @@
+name: test
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Cylc
+        uses: oliver-sanders/setup-cylc@main
+
+      - name: Run Cylc Tests
+        run: |
+          cylc validate ./toy
+          cylc lint ./toy
